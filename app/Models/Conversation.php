@@ -23,6 +23,13 @@ class Conversation extends Model
         ];
     }
 
+    protected $appends = ['avatar_url'];
+
+    public function getAvatarUrlAttribute()
+    {
+        return $this->avatar ? asset('storage/' . $this->avatar) : null;
+    }
+
     public function members()
     {
         return $this->belongsToMany(User::class)

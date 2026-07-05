@@ -53,18 +53,49 @@ class ConversationController extends Controller
             'member_ids.*' => 'exists:users,id',
             'is_group' => 'boolean',
             'name' => 'required_if:is_group,true|string|nullable',
+            'avatar' => 'nullable|image|max:4096',
         ]);
 
         $memberIds = array_unique(array_merge($data['member_ids'], [$request->user()->id]));
 
+        $avatarPath = null;
+        if ($request->hasFile('avatar')) {
+            $avatarPath = $request->file('avatar')->store('conversation-avatars', 'public');
+        }
+
         $conversation = Conversation::create([
             'is_group' => $data['is_group'] ?? false,
             'name' => $data['name'] ?? null,
+            'avatar' => $avatarPath,
             'created_by' => $request->user()->id,
         ]);
 
         $conversation->members()->attach($memberIds);
 
         return response()->json($conversation->load('members'), 201);
+    }
+
+    // PATCH /api/conversations/{conversation}/mute — toggle mute for me only
+    public function toggleMute(Request $request, Conversation $conversation)
+    {
+        abort_unless($conversation->members->contains($request->user()->id), 403);
+
+        $current = $conversation->members()->where('user_id', $request->user()->id)->first()->pivot->muted;
+
+        $conversation->members()->updateExistingPivot($request->user()->id, [
+            'muted' => ! $current,
+        ]);
+
+        return response()->json(['muted' => ! $current]);
+    }
+
+    // POST /api/conversations/{conversation}/leave
+    public function leave(Request $request, Conversation $conversation)
+    {
+        abort_unless($conversation->members->contains($request->user()->id), 403);
+
+        $conversation->members()->detach($request->user()->id);
+
+        return response()->json(['message' => 'Left conversation']);
     }
 }

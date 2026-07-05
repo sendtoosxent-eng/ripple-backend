@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\MessageController;
+use App\Http\Controllers\Api\StatusController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +25,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
     Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
     Route::post('/conversations/{conversation}/read', [MessageController::class, 'markRead']);
+    Route::patch('/conversations/{conversation}/mute', [ConversationController::class, 'toggleMute']);
+    Route::post('/conversations/{conversation}/leave', [ConversationController::class, 'leave']);
+
+    Route::get('/statuses', [StatusController::class, 'index']);
+    Route::post('/statuses', [StatusController::class, 'store']);
+    Route::post('/statuses/{status}/view', [StatusController::class, 'markViewed']);
+    Route::delete('/statuses/{status}', [StatusController::class, 'destroy']);
 });
 
 // Lets Laravel Echo verify a user is allowed to listen to a private channel.
