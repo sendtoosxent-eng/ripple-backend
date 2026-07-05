@@ -5,7 +5,11 @@ return [
 
     'allowed_methods' => ['*'],
 
-'allowed_origins' => ['http://localhost:3000', 'http://192.168.100.11:3000','https://ripple-chat-six.vercel.app/'],
+    // Replace with your real Vercel URL(s). Keep localhost for when you test locally too.
+    'allowed_origins' => [
+        'http://localhost:3000',
+        'https://ripple-chat-six.vercel.app/',
+    ],
 
     'allowed_origins_patterns' => [],
 
