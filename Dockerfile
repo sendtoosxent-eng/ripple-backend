@@ -1,9 +1,9 @@
 FROM php:8.3-cli
 
-# System dependencies + PHP extensions Laravel needs
+# System dependencies + PHP extensions Laravel needs (now Postgres instead of SQLite)
 RUN apt-get update && apt-get install -y \
-    git unzip libzip-dev libsqlite3-dev sqlite3 \
-    && docker-php-ext-install pdo pdo_sqlite zip \
+    git unzip libzip-dev libpq-dev \
+    && docker-php-ext-install pdo pdo_pgsql zip \
     && rm -rf /var/lib/apt/lists/*
 
 # Composer
@@ -14,10 +14,8 @@ COPY . .
 
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-# Make sure the SQLite database file + storage dirs exist and are writable
-RUN mkdir -p database storage/app/public storage/framework/cache storage/framework/sessions storage/framework/views storage/logs \
-    && touch database/database.sqlite \
-    && chmod -R 775 database storage bootstrap/cache
+RUN mkdir -p storage/app/public storage/framework/cache storage/framework/sessions storage/framework/views storage/logs \
+    && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 10000
 
