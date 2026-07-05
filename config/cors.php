@@ -7,10 +7,9 @@ return [
 
     // Replace with your real Vercel URL(s). Keep localhost for when you test locally too.
     'allowed_origins' => [
-        'http://localhost:3000',
-        'https://ripple-chat-six.vercel.app/',
-    ],
-
+    'http://localhost:3000',
+    'https://ripple-chat-six.vercel.app',
+],
     'allowed_origins_patterns' => [],
 
     'allowed_headers' => ['*'],
