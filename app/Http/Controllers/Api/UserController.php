@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\CloudinaryUploader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -56,11 +57,11 @@ class UserController extends Controller
         $data = $request->only(['name', 'username', 'bio', 'status']);
 
         if ($request->hasFile('avatar')) {
-            $data['avatar'] = $request->file('avatar')->store('avatars', 'public');
+            $data['avatar'] = CloudinaryUploader::upload($request->file('avatar'), 'avatars');
         }
 
         if ($request->hasFile('cover_photo')) {
-            $data['cover_photo'] = $request->file('cover_photo')->store('covers', 'public');
+            $data['cover_photo'] = CloudinaryUploader::upload($request->file('cover_photo'), 'covers');
         }
 
         $user->update($data);

@@ -27,7 +27,7 @@ class Conversation extends Model
 
     public function getAvatarUrlAttribute()
     {
-        return $this->avatar ? asset('storage/' . $this->avatar) : null;
+        return $this->avatar;
     }
 
     public function members()

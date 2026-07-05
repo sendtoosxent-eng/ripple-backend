@@ -44,6 +44,6 @@ class Message extends Model
 
     public function getMediaUrlAttribute()
     {
-        return $this->media_path ? asset('storage/' . $this->media_path) : null;
+        return $this->media_path;
     }
 }

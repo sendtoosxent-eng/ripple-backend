@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
+use App\Services\CloudinaryUploader;
 use Illuminate\Http\Request;
 
 class ConversationController extends Controller
@@ -60,7 +61,7 @@ class ConversationController extends Controller
 
         $avatarPath = null;
         if ($request->hasFile('avatar')) {
-            $avatarPath = $request->file('avatar')->store('conversation-avatars', 'public');
+            $avatarPath = CloudinaryUploader::upload($request->file('avatar'), 'conversation-avatars');
         }
 
         $conversation = Conversation::create([

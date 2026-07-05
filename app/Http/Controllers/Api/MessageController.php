@@ -6,6 +6,7 @@ use App\Events\MessageSent;
 use App\Events\MessagesRead;
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
+use App\Services\CloudinaryUploader;
 use Illuminate\Http\Request;
 
 class MessageController extends Controller
@@ -36,17 +37,17 @@ class MessageController extends Controller
         }
 
         if ($data['type'] === 'image') {
-            $path = $request->file('image')->store('chat-images', 'public');
+            $uploadedUrl = CloudinaryUploader::upload($request->file('image'), 'chat-images');
             [$width, $height] = getimagesize($request->file('image')->getRealPath());
-            $payload['media_path'] = $path;
+            $payload['media_path'] = $uploadedUrl;
             $payload['text'] = $data['caption'] ?? null;
             $payload['width'] = $width;
             $payload['height'] = $height;
         }
 
         if ($data['type'] === 'voice') {
-            $path = $request->file('audio')->store('chat-voice', 'public');
-            $payload['media_path'] = $path;
+            $uploadedUrl = CloudinaryUploader::upload($request->file('audio'), 'chat-voice');
+            $payload['media_path'] = $uploadedUrl;
             $payload['voice_duration'] = $data['duration'];
             // waveform is generated client-side while recording and sent as JSON, see below
             $payload['waveform'] = $request->input('waveform')

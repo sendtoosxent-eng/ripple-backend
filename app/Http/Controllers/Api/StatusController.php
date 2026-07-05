@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Status;
 use App\Models\StatusView;
+use App\Services\CloudinaryUploader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -70,7 +71,7 @@ class StatusController extends Controller
         ];
 
         if ($request->type === 'image' && $request->hasFile('image')) {
-            $payload['media_path'] = $request->file('image')->store('statuses', 'public');
+            $payload['media_path'] = CloudinaryUploader::upload($request->file('image'), 'statuses');
         }
 
         $status = Status::create($payload);
