@@ -63,23 +63,4 @@ class User extends Authenticatable
     {
         return $this->hasMany(Message::class, 'sender_id');
     }
-
-    public function sentFriendRequests()
-    {
-        return $this->hasMany(FriendRequest::class, 'sender_id');
-    }
-
-    public function receivedFriendRequests()
-    {
-        return $this->hasMany(FriendRequest::class, 'receiver_id');
-    }
-
-    public function friendsCount(): int
-    {
-        return FriendRequest::where('status', 'accepted')
-            ->where(function ($q) {
-                $q->where('sender_id', $this->id)->orWhere('receiver_id', $this->id);
-            })
-            ->count();
-    }
 }
