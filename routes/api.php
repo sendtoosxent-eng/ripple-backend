@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\FriendController;
 use App\Http\Controllers\Api\MessageController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PostController;
 use App\Http\Controllers\Api\StatusController;
 use App\Http\Controllers\Api\UserController;
@@ -19,9 +20,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::patch('/me', [UserController::class, 'update']);
+    Route::delete('/me', [UserController::class, 'destroy']);
 
     Route::get('/users', [UserController::class, 'index']);
     Route::get('/users/{user}', [UserController::class, 'show']);
+    Route::post('/users/{user}/block', [UserController::class, 'block']);
+    Route::post('/users/{user}/unblock', [UserController::class, 'unblock']);
 
     Route::get('/conversations', [ConversationController::class, 'index']);
     Route::post('/conversations', [ConversationController::class, 'store']);
@@ -36,6 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/statuses', [StatusController::class, 'store']);
     Route::post('/statuses/{status}/view', [StatusController::class, 'markViewed']);
     Route::delete('/statuses/{status}', [StatusController::class, 'destroy']);
+    Route::post('/statuses/{status}/reply', [StatusController::class, 'reply']);
 
     Route::get('/friend-requests', [FriendController::class, 'index']);
     Route::post('/friend-requests', [FriendController::class, 'store']);
@@ -47,9 +52,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/posts', [PostController::class, 'index']);
     Route::post('/posts', [PostController::class, 'store']);
     Route::post('/posts/{post}/like', [PostController::class, 'toggleLike']);
+    Route::post('/posts/{post}/repost', [PostController::class, 'toggleRepost']);
+    Route::get('/posts/{post}/comments', [PostController::class, 'comments']);
+    Route::post('/posts/{post}/comments', [PostController::class, 'addComment']);
     Route::delete('/posts/{post}', [PostController::class, 'destroy']);
+
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
 });
 
 // Lets Laravel Echo verify a user is allowed to listen to a private channel.
-// Registered here (not the default web route) so it authenticates via Sanctum token, matching the rest of the API.
 Broadcast::routes(['middleware' => ['auth:sanctum']]);

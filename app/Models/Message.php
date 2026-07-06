@@ -13,6 +13,7 @@ class Message extends Model
         'conversation_id',
         'sender_id',
         'reply_to_id',
+        'status_reply_id',
         'type',
         'text',
         'media_path',
@@ -45,13 +46,35 @@ class Message extends Model
         return $this->belongsTo(Message::class, 'reply_to_id');
     }
 
+    public function statusReply()
+    {
+        return $this->belongsTo(Status::class, 'status_reply_id');
+    }
+
     public function reactions()
     {
         return $this->hasMany(MessageReaction::class);
     }
 
     // Appends full public URLs / computed fields so the frontend doesn't build them itself
-    protected $appends = ['media_url', 'reply_preview', 'reaction_summary'];
+    protected $appends = ['media_url', 'reply_preview', 'reaction_summary', 'status_reply_preview'];
+
+    public function getStatusReplyPreviewAttribute()
+    {
+        if (! $this->status_reply_id || ! $this->relationLoaded('statusReply') || ! $this->statusReply) {
+            return null;
+        }
+
+        $status = $this->statusReply;
+
+        return [
+            'id' => $status->id,
+            'type' => $status->type,
+            'text' => $status->text,
+            'media_url' => $status->media_url,
+            'background' => $status->background,
+        ];
+    }
 
     public function getMediaUrlAttribute()
     {
