@@ -22,7 +22,9 @@ class Status extends Model
 
     public function getMediaUrlAttribute()
     {
-        return $this->media_path;
+        return $this->type === 'image'
+            ? \App\Services\CloudinaryUploader::resized($this->media_path, 900)
+            : $this->media_path;
     }
 
     public function user()

@@ -44,12 +44,12 @@ class User extends Authenticatable
 
     public function getAvatarUrlAttribute()
     {
-        return $this->avatar;
+        return \App\Services\CloudinaryUploader::resized($this->avatar, 200);
     }
 
     public function getCoverPhotoUrlAttribute()
     {
-        return $this->cover_photo;
+        return \App\Services\CloudinaryUploader::resized($this->cover_photo, 800);
     }
 
     public function conversations()
@@ -62,5 +62,24 @@ class User extends Authenticatable
     public function messages()
     {
         return $this->hasMany(Message::class, 'sender_id');
+    }
+
+    public function sentFriendRequests()
+    {
+        return $this->hasMany(FriendRequest::class, 'sender_id');
+    }
+
+    public function receivedFriendRequests()
+    {
+        return $this->hasMany(FriendRequest::class, 'receiver_id');
+    }
+
+    public function friendsCount(): int
+    {
+        return FriendRequest::where('status', 'accepted')
+            ->where(function ($q) {
+                $q->where('sender_id', $this->id)->orWhere('receiver_id', $this->id);
+            })
+            ->count();
     }
 }

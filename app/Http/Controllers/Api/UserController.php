@@ -33,6 +33,7 @@ class UserController extends Controller
             'bio' => $user->bio,
             'status' => $user->status,
             'online' => $user->online,
+            'friends_count' => $user->friendsCount(),
         ]);
     }
 

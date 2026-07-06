@@ -10,3 +10,9 @@ Broadcast::channel('conversation.{conversationId}', function ($user, $conversati
 
     return $conversation && $conversation->members->contains($user->id);
 });
+
+// Personal channel for a specific user — used for friend request notifications.
+// Only that user can listen on their own channel.
+Broadcast::channel('user.{userId}', function ($user, $userId) {
+    return (int) $user->id === (int) $userId;
+});

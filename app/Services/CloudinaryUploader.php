@@ -33,4 +33,18 @@ class CloudinaryUploader
 
         return $response->json('secure_url');
     }
+
+    /**
+     * Insert a resize/quality transformation into a Cloudinary URL so thumbnails
+     * (avatars, small previews) don't ship the full multi-MB original over mobile data.
+     * Leaves non-Cloudinary URLs (or audio/voice files) untouched.
+     */
+    public static function resized(?string $url, int $width): ?string
+    {
+        if (! $url || ! str_contains($url, '/upload/')) {
+            return $url;
+        }
+
+        return str_replace('/upload/', "/upload/w_{$width},c_fill,q_auto,f_auto/", $url);
+    }
 }

@@ -27,7 +27,7 @@ class Conversation extends Model
 
     public function getAvatarUrlAttribute()
     {
-        return $this->avatar;
+        return \App\Services\CloudinaryUploader::resized($this->avatar, 200);
     }
 
     public function members()

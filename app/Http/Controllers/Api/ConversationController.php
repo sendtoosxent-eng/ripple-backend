@@ -35,6 +35,8 @@ class ConversationController extends Controller
 
         $conversation->load([
             'messages.sender:id,name,username,avatar',
+            'messages.replyTo.sender:id,name,username',
+            'messages.reactions',
             'members:id,name,username,avatar,online,status',
         ]);
 
