@@ -36,7 +36,6 @@ class ConversationController extends Controller
         $conversation->load([
             'messages.sender:id,name,username,avatar',
             'messages.replyTo.sender:id,name,username',
-            'messages.statusReply',
             'messages.reactions',
             'members:id,name,username,avatar,online,status',
         ]);
@@ -61,32 +60,6 @@ class ConversationController extends Controller
         ]);
 
         $memberIds = array_unique(array_merge($data['member_ids'], [$request->user()->id]));
-
-        $nonFriendIds = array_filter(
-            $data['member_ids'],
-            fn ($id) => (int) $id !== $request->user()->id && ! $request->user()->isFriendsWith((int) $id),
-        );
-
-        if (! empty($nonFriendIds)) {
-            return response()->json([
-                'message' => 'You can only start a chat with friends. Add them as a friend first.',
-            ], 403);
-        }
-
-        // For 1-1 chats, reuse an existing conversation between these two people instead of
-        // creating a duplicate every time someone taps "Message".
-        if (empty($data['is_group']) && count($data['member_ids']) === 1) {
-            $otherId = $data['member_ids'][0];
-
-            $existing = $request->user()->conversations()
-                ->where('is_group', false)
-                ->whereHas('members', fn ($q) => $q->where('users.id', $otherId))
-                ->first();
-
-            if ($existing) {
-                return response()->json($existing->load('members'));
-            }
-        }
 
         $avatarPath = null;
         if ($request->hasFile('avatar')) {
