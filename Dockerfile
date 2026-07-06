@@ -3,7 +3,7 @@ FROM php:8.3-cli
 # System dependencies + PHP extensions Laravel needs (now Postgres instead of SQLite)
 RUN apt-get update && apt-get install -y \
     git unzip libzip-dev libpq-dev \
-    && docker-php-ext-install pdo pdo_pgsql zip \
+    && docker-php-ext-install pdo pdo_pgsql zip pcntl \
     && rm -rf /var/lib/apt/lists/*
 
 # Composer
