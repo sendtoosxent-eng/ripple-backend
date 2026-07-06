@@ -2,9 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Events\MessageSent;
 use App\Http\Controllers\Controller;
-use App\Models\Conversation;
 use App\Models\Status;
 use App\Models\StatusView;
 use App\Services\CloudinaryUploader;
@@ -102,41 +100,5 @@ class StatusController extends Controller
         $status->delete();
 
         return response()->json(['message' => 'Deleted']);
-    }
-
-    // POST /api/statuses/{status}/reply — reply or react to a friend's status (sent as a DM, WhatsApp-style)
-    public function reply(Request $request, Status $status)
-    {
-        $me = $request->user();
-
-        abort_if($status->user_id === $me->id, 422, "You can't reply to your own status.");
-        abort_unless($me->isFriendsWith($status->user_id), 403, 'You can only reply to a friend\'s status.');
-
-        $data = $request->validate(['text' => 'required|string|max:500']);
-
-        // Reuse an existing 1-1 conversation with the status owner, or create one
-        $conversation = $me->conversations()
-            ->where('is_group', false)
-            ->whereHas('members', fn ($q) => $q->where('users.id', $status->user_id))
-            ->first();
-
-        if (! $conversation) {
-            $conversation = Conversation::create(['is_group' => false, 'created_by' => $me->id]);
-            $conversation->members()->attach([$me->id, $status->user_id]);
-        }
-
-        $message = $conversation->messages()->create([
-            'sender_id' => $me->id,
-            'type' => 'text',
-            'text' => $data['text'],
-            'status_reply_id' => $status->id,
-            'status' => 'sent',
-        ]);
-
-        $message->load(['sender:id,name,username,avatar', 'statusReply', 'reactions']);
-
-        broadcast(new MessageSent($message))->toOthers();
-
-        return response()->json(['conversation_id' => $conversation->id, 'message' => $message], 201);
     }
 }
