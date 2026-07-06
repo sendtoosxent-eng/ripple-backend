@@ -19,4 +19,4 @@ RUN mkdir -p storage/app/public storage/framework/cache storage/framework/sessio
 
 EXPOSE 10000
 
-CMD php artisan migrate --force && php artisan storage:link && php artisan serve --host 0.0.0.0 --port ${PORT:-10000}
+CMD php artisan migrate --force && php artisan conversations:dedupe && php artisan storage:link && php artisan serve --host 0.0.0.0 --port ${PORT:-10000}
