@@ -60,7 +60,7 @@ class PostController extends Controller
         $post = Post::create($payload);
         $post->load('user:id,name,username,avatar');
 
-        broadcast(new PostCreated($post))->toOthers();
+        \App\Services\SafeBroadcast::send(new PostCreated($post));
 
         // Notify friends that this person posted
         $author = $request->user();
@@ -146,7 +146,7 @@ class PostController extends Controller
         ]);
         $comment->load('user:id,name,username,avatar');
 
-        broadcast(new PostCommentAdded($comment))->toOthers();
+        \App\Services\SafeBroadcast::send(new PostCommentAdded($comment));
 
         if ($post->user_id !== $request->user()->id) {
             Notifier::send($post->user_id, 'post_commented', [

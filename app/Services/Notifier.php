@@ -16,6 +16,6 @@ class Notifier
             'read' => false,
         ]);
 
-        broadcast(new NotificationCreated($notification))->toOthers();
+        SafeBroadcast::send(new NotificationCreated($notification));
     }
 }

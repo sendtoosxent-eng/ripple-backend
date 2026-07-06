@@ -27,7 +27,7 @@ class FriendController extends Controller
 
         if ($incoming) {
             $incoming->update(['status' => 'accepted']);
-            broadcast(new FriendRequestUpdated($incoming->fresh(), $request->user()->id))->toOthers();
+            \App\Services\SafeBroadcast::send(new FriendRequestUpdated($incoming->fresh(), $request->user()->id));
             Notifier::send($incoming->sender_id, 'friend_accepted', [
                 'actor_id' => $request->user()->id,
                 'actor_name' => $request->user()->name,
@@ -41,7 +41,7 @@ class FriendController extends Controller
             ['status' => 'pending'],
         );
 
-        broadcast(new FriendRequestUpdated($fr, $request->user()->id))->toOthers();
+        \App\Services\SafeBroadcast::send(new FriendRequestUpdated($fr, $request->user()->id));
 
         return response()->json($fr, 201);
     }
@@ -63,7 +63,7 @@ class FriendController extends Controller
     {
         abort_unless($friendRequest->receiver_id === $request->user()->id, 403);
         $friendRequest->update(['status' => 'accepted']);
-        broadcast(new FriendRequestUpdated($friendRequest, $request->user()->id))->toOthers();
+        \App\Services\SafeBroadcast::send(new FriendRequestUpdated($friendRequest, $request->user()->id));
 
         Notifier::send($friendRequest->sender_id, 'friend_accepted', [
             'actor_id' => $request->user()->id,

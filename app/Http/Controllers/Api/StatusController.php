@@ -135,7 +135,7 @@ class StatusController extends Controller
 
         $message->load(['sender:id,name,username,avatar', 'statusReply', 'reactions']);
 
-        broadcast(new MessageSent($message))->toOthers();
+        \App\Services\SafeBroadcast::send(new MessageSent($message));
 
         return response()->json(['conversation_id' => $conversation->id, 'message' => $message], 201);
     }

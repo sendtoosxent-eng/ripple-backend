@@ -69,7 +69,7 @@ class MessageController extends Controller
         $message = $conversation->messages()->create($payload);
         $message->load(['sender:id,name,username,avatar', 'replyTo.sender:id,name,username', 'reactions']);
 
-        broadcast(new MessageSent($message))->toOthers();
+        \App\Services\SafeBroadcast::send(new MessageSent($message));
 
         return response()->json($message, 201);
     }
@@ -97,7 +97,7 @@ class MessageController extends Controller
         }
 
         $message->load('reactions');
-        broadcast(new MessageReacted($message))->toOthers();
+        \App\Services\SafeBroadcast::send(new MessageReacted($message));
 
         return response()->json(['reaction_summary' => $message->reaction_summary]);
     }
@@ -117,7 +117,7 @@ class MessageController extends Controller
             'last_read_at' => now(),
         ]);
 
-        broadcast(new MessagesRead($conversation->id, $request->user()->id))->toOthers();
+        \App\Services\SafeBroadcast::send(new MessagesRead($conversation->id, $request->user()->id));
 
         return response()->json(['message' => 'Marked as read']);
     }
