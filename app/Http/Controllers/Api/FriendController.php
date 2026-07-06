@@ -6,6 +6,7 @@ use App\Events\FriendRequestUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\FriendRequest;
 use App\Models\User;
+use App\Services\Notifier;
 use Illuminate\Http\Request;
 
 class FriendController extends Controller
@@ -27,6 +28,11 @@ class FriendController extends Controller
         if ($incoming) {
             $incoming->update(['status' => 'accepted']);
             broadcast(new FriendRequestUpdated($incoming->fresh(), $request->user()->id))->toOthers();
+            Notifier::send($incoming->sender_id, 'friend_accepted', [
+                'actor_id' => $request->user()->id,
+                'actor_name' => $request->user()->name,
+                'actor_avatar' => $request->user()->avatar_url,
+            ]);
             return response()->json($incoming->fresh());
         }
 
@@ -58,6 +64,12 @@ class FriendController extends Controller
         abort_unless($friendRequest->receiver_id === $request->user()->id, 403);
         $friendRequest->update(['status' => 'accepted']);
         broadcast(new FriendRequestUpdated($friendRequest, $request->user()->id))->toOthers();
+
+        Notifier::send($friendRequest->sender_id, 'friend_accepted', [
+            'actor_id' => $request->user()->id,
+            'actor_name' => $request->user()->name,
+            'actor_avatar' => $request->user()->avatar_url,
+        ]);
 
         return response()->json($friendRequest);
     }

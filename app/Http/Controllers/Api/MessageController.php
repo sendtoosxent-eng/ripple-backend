@@ -19,6 +19,13 @@ class MessageController extends Controller
     {
         abort_unless($conversation->members->contains($request->user()->id), 403);
 
+        if (! $conversation->is_group) {
+            $other = $conversation->members->firstWhere('id', '!=', $request->user()->id);
+            if ($other && ($request->user()->hasBlocked($other->id) || $request->user()->isBlockedBy($other->id))) {
+                abort(403, 'You cannot message this user.');
+            }
+        }
+
         $data = $request->validate([
             'type' => 'required|in:text,image,voice',
             'text' => 'required_if:type,text|nullable|string',
