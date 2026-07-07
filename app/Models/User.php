@@ -44,11 +44,19 @@ class User extends Authenticatable
 
     public function getAvatarUrlAttribute()
     {
+        // Guard against leftover data from before the Cloudinary migration —
+        // old records may have a bare local path instead of a full URL.
+        if ($this->avatar && ! str_starts_with($this->avatar, 'http')) {
+            return null;
+        }
         return \App\Services\CloudinaryUploader::resized($this->avatar, 200);
     }
 
     public function getCoverPhotoUrlAttribute()
     {
+        if ($this->cover_photo && ! str_starts_with($this->cover_photo, 'http')) {
+            return null;
+        }
         return \App\Services\CloudinaryUploader::resized($this->cover_photo, 800);
     }
 
