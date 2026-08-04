@@ -14,7 +14,9 @@ class ConversationController extends Controller
     {
         $conversations = $request->user()->conversations()
             ->with(['latestMessage.sender:id,name,username,avatar', 'members:id,name,username,avatar,online'])
-            ->get();
+            ->get()
+            ->sortByDesc(fn ($conversation) => $conversation->latestMessage?->created_at ?? $conversation->created_at)
+            ->values();
 
         // Unread count = messages from other people since this user last read the conversation
         $conversations->each(function ($conversation) use ($request) {
