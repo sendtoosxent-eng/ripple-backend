@@ -83,8 +83,12 @@ class SocialFeaturesTest extends TestCase
         $this->getJson('/api/statuses')->assertOk()->assertJsonFragment(['id' => $statusId]);
         $this->postJson('/api/statuses/'.$statusId.'/view')->assertOk();
         $this->postJson('/api/statuses/'.$statusId.'/reply', ['text' => 'Great'])->assertCreated();
+        $this->postJson('/api/statuses/'.$statusId.'/like')->assertOk()->assertJson(['liked' => true, 'likes_count' => 1]);
+        $repostId = $this->postJson('/api/statuses/'.$statusId.'/repost')->assertCreated()->json('id');
 
         $this->assertDatabaseHas('status_views', ['status_id' => $statusId, 'viewer_id' => $bob->id]);
         $this->assertDatabaseHas('messages', ['status_reply_id' => $statusId, 'sender_id' => $bob->id]);
+        $this->assertDatabaseHas('status_likes', ['status_id' => $statusId, 'user_id' => $bob->id]);
+        $this->assertDatabaseHas('statuses', ['id' => $repostId, 'user_id' => $bob->id, 'reposted_from_id' => $statusId]);
     }
 }

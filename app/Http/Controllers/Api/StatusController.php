@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Conversation;
 use App\Models\Status;
 use App\Models\StatusView;
+use App\Models\StatusLike;
+use App\Services\Notifier;
 use App\Services\CloudinaryUploader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -22,7 +24,7 @@ class StatusController extends Controller
 
         $statuses = Status::active()
             ->whereIn('user_id', $friendIds)
-            ->with(['user:id,name,username,avatar', 'views'])
+            ->with(['user:id,name,username,avatar', 'views', 'likes', 'repostedFrom.user:id,name,username,avatar'])
             ->orderBy('created_at')
             ->get()
             ->groupBy('user_id')
@@ -45,6 +47,16 @@ class StatusController extends Controller
                         'created_at' => $s->created_at,
                         'viewed_by_me' => $s->views->contains('viewer_id', $me->id),
                         'view_count' => $s->views->count(),
+                        'likes_count' => $s->likes->count(),
+                        'liked_by_me' => $s->likes->contains('user_id', $me->id),
+                        'reposted_from' => $s->repostedFrom ? [
+                            'id' => $s->repostedFrom->id,
+                            'user' => [
+                                'id' => $s->repostedFrom->user->id,
+                                'name' => $s->repostedFrom->user->name,
+                                'username' => $s->repostedFrom->user->username,
+                            ],
+                        ] : null,
                     ]),
                 ];
             })
@@ -60,7 +72,7 @@ class StatusController extends Controller
             'type' => 'required|in:text,image',
             'text' => 'required_if:type,text|nullable|string|max:500',
             'image' => 'required_if:type,image|nullable|image|max:8192',
-            'background' => 'nullable|string|max:20',
+            'background' => 'nullable|string|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -137,6 +149,65 @@ class StatusController extends Controller
 
         \App\Services\SafeBroadcast::send(new MessageSent($message));
 
+        Notifier::send($status->user_id, 'new_message', [
+            'actor_id' => $me->id,
+            'actor_name' => $me->name,
+            'actor_avatar' => $me->avatar_url,
+            'conversation_id' => $conversation->id,
+            'preview' => $data['text'],
+        ]);
+
         return response()->json(['conversation_id' => $conversation->id, 'message' => $message], 201);
+    }
+
+    public function toggleLike(Request $request, Status $status)
+    {
+        abort_if($status->expires_at->isPast(), 410, 'This update has expired.');
+        abort_unless($status->user_id === $request->user()->id || $request->user()->isFriendsWith($status->user_id), 403);
+
+        $like = StatusLike::where('status_id', $status->id)->where('user_id', $request->user()->id)->first();
+        if ($like) {
+            $like->delete();
+            $liked = false;
+        } else {
+            StatusLike::create(['status_id' => $status->id, 'user_id' => $request->user()->id]);
+            $liked = true;
+            if ($status->user_id !== $request->user()->id) {
+                Notifier::send($status->user_id, 'status_liked', [
+                    'actor_id' => $request->user()->id,
+                    'actor_name' => $request->user()->name,
+                    'status_id' => $status->id,
+                ]);
+            }
+        }
+
+        return response()->json(['liked' => $liked, 'likes_count' => $status->likes()->count()]);
+    }
+
+    public function repost(Request $request, Status $status)
+    {
+        abort_if($status->user_id === $request->user()->id, 422, 'You cannot repost your own update.');
+        abort_if($status->expires_at->isPast(), 410, 'This update has expired.');
+        abort_unless($request->user()->isFriendsWith($status->user_id), 403, 'You can only repost a friend\'s update.');
+
+        $original = $status->repostedFrom ?: $status;
+        abort_if(Status::active()->where('user_id', $request->user()->id)->where('reposted_from_id', $original->id)->exists(), 422, 'You already reshared this update.');
+        $repost = Status::create([
+            'user_id' => $request->user()->id,
+            'reposted_from_id' => $original->id,
+            'type' => $original->type,
+            'text' => $original->text,
+            'media_path' => $original->media_path,
+            'background' => $original->background,
+            'expires_at' => now()->addDay(),
+        ]);
+
+        Notifier::send($original->user_id, 'status_reposted', [
+            'actor_id' => $request->user()->id,
+            'actor_name' => $request->user()->name,
+            'status_id' => $original->id,
+        ]);
+
+        return response()->json($repost, 201);
     }
 }

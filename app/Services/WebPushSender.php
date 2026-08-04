@@ -54,6 +54,8 @@ class WebPushSender
             'post_liked' => ['title' => 'New like', 'body' => "$actor liked your post", 'url' => '/posts'],
             'post_commented' => ['title' => 'New comment', 'body' => "$actor commented on your post", 'url' => '/posts'],
             'post_reposted' => ['title' => 'New repost', 'body' => "$actor reposted your post", 'url' => '/posts'],
+            'status_liked' => ['title' => 'Status liked', 'body' => "$actor liked your update", 'url' => '/status'],
+            'status_reposted' => ['title' => 'Status reshared', 'body' => "$actor reshared your update", 'url' => '/status'],
             default => ['title' => 'Ripple', 'body' => "$actor shared an update", 'url' => '/notifications'],
         };
     }

@@ -43,6 +43,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/statuses/{status}/view', [StatusController::class, 'markViewed']);
     Route::delete('/statuses/{status}', [StatusController::class, 'destroy']);
     Route::post('/statuses/{status}/reply', [StatusController::class, 'reply']);
+    Route::post('/statuses/{status}/like', [StatusController::class, 'toggleLike']);
+    Route::post('/statuses/{status}/repost', [StatusController::class, 'repost']);
 
     Route::get('/friend-requests', [FriendController::class, 'index']);
     Route::post('/friend-requests', [FriendController::class, 'store']);

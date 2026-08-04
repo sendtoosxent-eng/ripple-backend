@@ -9,7 +9,7 @@ class Status extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['user_id', 'type', 'text', 'media_path', 'background', 'expires_at'];
+    protected $fillable = ['user_id', 'reposted_from_id', 'type', 'text', 'media_path', 'background', 'expires_at'];
 
     protected function casts(): array
     {
@@ -35,6 +35,16 @@ class Status extends Model
     public function views()
     {
         return $this->hasMany(StatusView::class);
+    }
+
+    public function likes()
+    {
+        return $this->hasMany(StatusLike::class);
+    }
+
+    public function repostedFrom()
+    {
+        return $this->belongsTo(self::class, 'reposted_from_id');
     }
 
     public function scopeActive($query)
