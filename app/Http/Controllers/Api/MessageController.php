@@ -10,6 +10,7 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\MessageReaction;
 use App\Services\CloudinaryUploader;
+use App\Services\Notifier;
 use Illuminate\Http\Request;
 
 class MessageController extends Controller
@@ -23,6 +24,7 @@ class MessageController extends Controller
             $other = $conversation->members->firstWhere('id', '!=', $request->user()->id);
             if ($other && ($request->user()->hasBlocked($other->id) || $request->user()->isBlockedBy($other->id))) {
                 abort(403, 'You cannot message this user.');
+                // message('You cannot message this user because you have blocked them or they have blocked you.');
             }
         }
 
@@ -35,6 +37,14 @@ class MessageController extends Controller
             'duration' => 'required_if:type,voice|nullable|string', // e.g. "0:14"
             'reply_to_id' => 'nullable|exists:messages,id',
         ]);
+
+        if (! empty($data['reply_to_id'])) {
+            $replyBelongsToConversation = $conversation->messages()
+                ->whereKey($data['reply_to_id'])
+                ->exists();
+
+            abort_unless($replyBelongsToConversation, 422, 'The replied-to message is not part of this conversation.');
+        }
 
         $payload = [
             'conversation_id' => $conversation->id,
@@ -68,6 +78,18 @@ class MessageController extends Controller
 
         $message = $conversation->messages()->create($payload);
         $message->load(['sender:id,name,username,avatar', 'replyTo.sender:id,name,username', 'reactions']);
+
+        foreach ($conversation->members()->where('users.id', '!=', $request->user()->id)->get() as $recipient) {
+            if (! $recipient->pivot->muted) {
+                Notifier::send($recipient->id, 'new_message', [
+                    'actor_id' => $request->user()->id,
+                    'actor_name' => $request->user()->name,
+                    'actor_avatar' => $request->user()->avatar_url,
+                    'conversation_id' => $conversation->id,
+                    'preview' => $message->type === 'text' ? \Illuminate\Support\Str::limit($message->text, 80) : ucfirst($message->type).' message',
+                ]);
+            }
+        }
 
         \App\Services\SafeBroadcast::send(new MessageSent($message));
 

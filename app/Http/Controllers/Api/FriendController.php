@@ -20,6 +20,11 @@ class FriendController extends Controller
             return response()->json(['message' => 'You cannot friend yourself.'], 422);
         }
 
+
+        if ($request->user()->hasBlocked((int) $data['receiver_id']) || $request->user()->isBlockedBy((int) $data['receiver_id'])) {
+            return response()->json(['message' => 'A friend request cannot be sent to this account.'], 403);
+        }
+
         // If the other person already sent me one, accept it instead of creating a duplicate
         $incoming = FriendRequest::where('sender_id', $data['receiver_id'])
             ->where('receiver_id', $request->user()->id)
@@ -36,7 +41,7 @@ class FriendController extends Controller
             return response()->json($incoming->fresh());
         }
 
-        $fr = FriendRequest::firstOrCreate(
+        $fr = FriendRequest::updateOrCreate(
             ['sender_id' => $request->user()->id, 'receiver_id' => $data['receiver_id']],
             ['status' => 'pending'],
         );

@@ -8,6 +8,15 @@ use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
+    private const DEFAULT_PREFERENCES = [
+        'push' => true,
+        'sound' => true,
+        'vibrate' => false,
+        'messages' => true,
+        'social' => true,
+        'reminders' => true,
+    ];
+
     // GET /api/notifications — my recent notifications, newest first.
     // Viewing the list marks everything as read (simple, no per-item read tracking needed).
     public function index(Request $request)
@@ -32,5 +41,35 @@ class NotificationController extends Controller
             ->count();
 
         return response()->json(['count' => $count]);
+    }
+
+    public function preferences(Request $request)
+    {
+        return response()->json(array_merge(
+            self::DEFAULT_PREFERENCES,
+            $request->user()->notification_preferences ?? [],
+        ));
+    }
+
+    public function updatePreferences(Request $request)
+    {
+        $data = $request->validate([
+            'push' => 'sometimes|boolean',
+            'sound' => 'sometimes|boolean',
+            'vibrate' => 'sometimes|boolean',
+            'messages' => 'sometimes|boolean',
+            'social' => 'sometimes|boolean',
+            'reminders' => 'sometimes|boolean',
+        ]);
+
+        $preferences = array_merge(
+            self::DEFAULT_PREFERENCES,
+            $request->user()->notification_preferences ?? [],
+            $data,
+        );
+
+        $request->user()->update(['notification_preferences' => $preferences]);
+
+        return response()->json($preferences);
     }
 }

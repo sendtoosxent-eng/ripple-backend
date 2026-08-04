@@ -75,4 +75,15 @@ class AuthController extends Controller
     {
         return response()->json($request->user()->append(['friends_count', 'posts_count']));
     }
+
+    public function presence(Request $request)
+    {
+        $data = $request->validate(['online' => 'required|boolean']);
+        $request->user()->update([
+            'online' => $data['online'],
+            'last_seen_at' => now(),
+        ]);
+
+        return response()->noContent();
+    }
 }

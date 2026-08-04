@@ -18,6 +18,7 @@ Route::post('/login', [AuthController::class, 'login']);
 // Authenticated (Sanctum token required)
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/presence', [AuthController::class, 'presence']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::patch('/me', [UserController::class, 'update']);
     Route::delete('/me', [UserController::class, 'destroy']);
@@ -59,6 +60,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::get('/notification-preferences', [NotificationController::class, 'preferences']);
+    Route::patch('/notification-preferences', [NotificationController::class, 'updatePreferences']);
 });
 
 // Lets Laravel Echo verify a user is allowed to listen to a private channel.

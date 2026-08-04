@@ -23,6 +23,7 @@ class User extends Authenticatable
         'bio',
         'online',
         'last_seen_at',
+        'notification_preferences',
     ];
 
     protected $hidden = [
@@ -37,6 +38,7 @@ class User extends Authenticatable
             'last_seen_at' => 'datetime',
             'online' => 'boolean',
             'password' => 'hashed',
+            'notification_preferences' => 'array',
         ];
     }
 

@@ -33,6 +33,11 @@ class ConversationController extends Controller
     {
         abort_unless($conversation->members->contains($request->user()->id), 403);
 
+        $conversation->messages()
+            ->where('sender_id', '!=', $request->user()->id)
+            ->where('status', 'sent')
+            ->update(['status' => 'delivered']);
+
         $conversation->load([
             'messages.sender:id,name,username,avatar',
             'messages.replyTo.sender:id,name,username',
@@ -71,6 +76,16 @@ class ConversationController extends Controller
             return response()->json([
                 'message' => 'You can only start a chat with friends. Add them as a friend first.',
             ], 403);
+        }
+
+        $blockedIds = array_filter(
+            $data['member_ids'],
+            fn ($id) => (int) $id !== $request->user()->id
+                && ($request->user()->hasBlocked((int) $id) || $request->user()->isBlockedBy((int) $id)),
+        );
+
+        if (! empty($blockedIds)) {
+            return response()->json(['message' => 'A conversation cannot include a blocked account.'], 403);
         }
 
         // For 1-1 chats, reuse an existing conversation between these two people instead of
@@ -123,6 +138,7 @@ class ConversationController extends Controller
     public function leave(Request $request, Conversation $conversation)
     {
         abort_unless($conversation->members->contains($request->user()->id), 403);
+        abort_unless($conversation->is_group, 422, 'You cannot leave a one-to-one conversation.');
 
         $conversation->members()->detach($request->user()->id);
 

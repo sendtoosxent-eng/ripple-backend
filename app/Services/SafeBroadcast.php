@@ -20,6 +20,9 @@ class SafeBroadcast
             if ($toOthersOnly) {
                 $broadcast->toOthers();
             }
+            // PendingBroadcast dispatches from its destructor. Destroy it inside this
+            // try block so connection failures are caught instead of escaping later.
+            unset($broadcast);
         } catch (Throwable $e) {
             Log::warning('Broadcast failed (non-fatal): ' . $e->getMessage(), [
                 'event' => get_class($event),
