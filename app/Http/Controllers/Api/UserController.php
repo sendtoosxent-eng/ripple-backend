@@ -77,7 +77,7 @@ class UserController extends Controller
 
         $user->update($data);
 
-        return response()->json($user->fresh()->append(['friends_count', 'posts_count']));
+        return response()->json($user->fresh()->append(['friends_count', 'posts_count', 'reshared_count']));
     }
 
     // DELETE /api/me — permanently delete my account

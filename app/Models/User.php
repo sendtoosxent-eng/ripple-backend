@@ -72,6 +72,11 @@ class User extends Authenticatable
         return $this->postsCount();
     }
 
+    public function getResharedCountAttribute(): int
+    {
+        return PostRepost::where('user_id', $this->id)->count();
+    }
+
     public function conversations()
     {
         return $this->belongsToMany(Conversation::class)

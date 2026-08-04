@@ -40,7 +40,7 @@ class AuthController extends Controller
 
         $token = $user->createToken('chat-app')->plainTextToken;
 
-        return response()->json(['user' => $user, 'token' => $token], 201);
+        return response()->json(['user' => $user->append(['friends_count', 'posts_count', 'reshared_count']), 'token' => $token], 201);
     }
 
     public function login(Request $request)
@@ -60,7 +60,7 @@ class AuthController extends Controller
 
         $token = $user->createToken('chat-app')->plainTextToken;
 
-        return response()->json(['user' => $user, 'token' => $token]);
+        return response()->json(['user' => $user->append(['friends_count', 'posts_count', 'reshared_count']), 'token' => $token]);
     }
 
     public function logout(Request $request)
@@ -73,7 +73,7 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return response()->json($request->user()->append(['friends_count', 'posts_count']));
+        return response()->json($request->user()->append(['friends_count', 'posts_count', 'reshared_count']));
     }
 
     public function presence(Request $request)
