@@ -15,6 +15,25 @@ use Illuminate\Http\Request;
 
 class MessageController extends Controller
 {
+    public function index(Request $request, Conversation $conversation)
+    {
+        abort_unless($conversation->members->contains($request->user()->id), 403);
+        $data = $request->validate(['before_id' => 'nullable|integer|min:1', 'limit' => 'nullable|integer|min:10|max:100']);
+        $limit = $data['limit'] ?? 40;
+        $query = $conversation->messages()->reorder()->with([
+            'sender:id,name,username,avatar',
+            'replyTo.sender:id,name,username',
+            'statusReply',
+            'reactions',
+        ]);
+        if (! empty($data['before_id'])) $query->where('id', '<', $data['before_id']);
+        $items = $query->orderByDesc('id')->limit($limit + 1)->get();
+        $hasMore = $items->count() > $limit;
+        $messages = $items->take($limit)->reverse()->values();
+
+        return response()->json(['data' => $messages, 'has_more' => $hasMore]);
+    }
+
     // POST /api/conversations/{conversation}/messages
     public function store(Request $request, Conversation $conversation)
     {

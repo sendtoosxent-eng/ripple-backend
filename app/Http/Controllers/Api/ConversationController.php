@@ -40,13 +40,12 @@ class ConversationController extends Controller
             ->where('status', 'sent')
             ->update(['status' => 'delivered']);
 
-        $conversation->load([
-            'messages.sender:id,name,username,avatar',
-            'messages.replyTo.sender:id,name,username',
-            'messages.statusReply',
-            'messages.reactions',
-            'members:id,name,username,avatar,online,status',
-        ]);
+        $conversation->load(['members:id,name,username,avatar,online,status']);
+        $items = $conversation->messages()->reorder()->with([
+            'sender:id,name,username,avatar', 'replyTo.sender:id,name,username', 'statusReply', 'reactions',
+        ])->orderByDesc('id')->limit(41)->get();
+        $conversation->setRelation('messages', $items->take(40)->reverse()->values());
+        $conversation->has_more_messages = $items->count() > 40;
 
         // mark as read
         $conversation->members()->updateExistingPivot($request->user()->id, [

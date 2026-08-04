@@ -112,6 +112,27 @@ class CoreMessagingFlowTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_conversation_history_is_paginated_newest_first_without_losing_order(): void
+    {
+        [$alice, $bob] = User::factory()->count(2)->create();
+        $conversation = $this->conversation([$alice, $bob], $alice);
+        foreach (range(1, 45) as $number) {
+            Message::create(['conversation_id' => $conversation->id, 'sender_id' => $alice->id, 'type' => 'text', 'text' => "Message {$number}", 'status' => 'sent']);
+        }
+
+        Sanctum::actingAs($bob);
+        $initial = $this->getJson('/api/conversations/'.$conversation->id)->assertOk();
+        $this->assertCount(40, $initial->json('messages'));
+        $this->assertTrue($initial->json('has_more_messages'));
+        $oldestLoadedId = $initial->json('messages.0.id');
+
+        $older = $this->getJson('/api/conversations/'.$conversation->id.'/messages?before_id='.$oldestLoadedId)
+            ->assertOk()
+            ->assertJson(['has_more' => false]);
+        $this->assertCount(5, $older->json('data'));
+        $this->assertSame('Message 1', $older->json('data.0.text'));
+    }
+
     private function conversation(array $members, User $creator): Conversation
     {
         $conversation = Conversation::create([

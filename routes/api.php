@@ -32,6 +32,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/conversations', [ConversationController::class, 'index']);
     Route::post('/conversations', [ConversationController::class, 'store']);
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
+    Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']);
     Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
     Route::post('/conversations/{conversation}/read', [MessageController::class, 'markRead']);
     Route::patch('/conversations/{conversation}/mute', [ConversationController::class, 'toggleMute']);
