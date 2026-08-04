@@ -43,6 +43,7 @@ class UserController extends Controller
             'online' => $user->online,
             'friends_count' => $user->friendsCount(),
             'posts_count' => $user->postsCount(),
+            'reshared_count' => \App\Models\PostRepost::where('user_id', $user->id)->count(),
             'is_blocked_by_me' => $me->hasBlocked($user->id),
         ]);
     }
