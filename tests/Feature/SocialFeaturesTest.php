@@ -29,6 +29,23 @@ class SocialFeaturesTest extends TestCase
         $this->assertFalse($user->fresh()->notification_preferences['sound']);
     }
 
+    public function test_a_user_can_register_and_remove_a_push_subscription(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $endpoint = 'https://push.example.test/subscriptions/device-1';
+
+        $this->postJson('/api/push/subscriptions', [
+            'endpoint' => $endpoint,
+            'keys' => ['p256dh' => str_repeat('a', 87), 'auth' => str_repeat('b', 22)],
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('push_subscriptions', ['user_id' => $user->id, 'endpoint' => $endpoint]);
+
+        $this->deleteJson('/api/push/subscriptions', ['endpoint' => $endpoint])->assertNoContent();
+        $this->assertDatabaseMissing('push_subscriptions', ['endpoint' => $endpoint]);
+    }
+
     public function test_post_activity_creates_notifications(): void
     {
         [$author, $friend] = User::factory()->count(2)->create();

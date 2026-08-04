@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\FriendController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PostController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\StatusController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Broadcast;
@@ -62,6 +63,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::get('/notification-preferences', [NotificationController::class, 'preferences']);
     Route::patch('/notification-preferences', [NotificationController::class, 'updatePreferences']);
+    Route::get('/push/vapid-public-key', [PushSubscriptionController::class, 'key']);
+    Route::post('/push/subscriptions', [PushSubscriptionController::class, 'store']);
+    Route::delete('/push/subscriptions', [PushSubscriptionController::class, 'destroy']);
 });
 
 // Lets Laravel Echo verify a user is allowed to listen to a private channel.

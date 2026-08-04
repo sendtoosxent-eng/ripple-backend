@@ -35,5 +35,6 @@ class Notifier
         ]);
 
         SafeBroadcast::send(new NotificationCreated($notification));
+        WebPushSender::send($userId, $type, $data);
     }
 }
