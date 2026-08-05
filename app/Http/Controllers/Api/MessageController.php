@@ -17,6 +17,24 @@ use Illuminate\Support\Facades\DB;
 
 class MessageController extends Controller
 {
+    public function notifyIncomingCall(Request $request, Conversation $conversation)
+    {
+        abort_unless($conversation->members->contains($request->user()->id), 403);
+        abort_unless(! $conversation->is_group, 422, 'Group calls are not supported.');
+
+        $recipient = $conversation->members->firstWhere('id', '!=', $request->user()->id);
+        abort_unless($recipient, 422, 'This call has no recipient.');
+
+        Notifier::send($recipient->id, 'incoming_call', [
+            'actor_id' => $request->user()->id,
+            'actor_name' => $request->user()->name,
+            'actor_avatar' => $request->user()->avatar_url,
+            'conversation_id' => $conversation->id,
+        ]);
+
+        return response()->noContent();
+    }
+
     public function index(Request $request, Conversation $conversation)
     {
         abort_unless($conversation->members->contains($request->user()->id), 403);

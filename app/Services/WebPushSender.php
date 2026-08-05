@@ -50,6 +50,7 @@ class WebPushSender
         $actor = $data['actor_name'] ?? 'Someone';
         return match ($type) {
             'new_message' => ['title' => $actor, 'body' => $data['preview'] ?? 'Sent you a message', 'url' => '/chats/'.($data['conversation_id'] ?? '')],
+            'incoming_call' => ['title' => 'Incoming voice call', 'body' => "$actor is calling you", 'url' => '/chats/'.($data['conversation_id'] ?? ''), 'tag' => 'incoming-call-'.($data['conversation_id'] ?? ''), 'require_interaction' => true, 'incoming_call' => true],
             'friend_accepted' => ['title' => 'Friend request accepted', 'body' => "$actor accepted your friend request", 'url' => '/users/'.($data['actor_id'] ?? '')],
             'post_liked' => ['title' => 'New like', 'body' => "$actor liked your post", 'url' => '/posts'],
             'post_commented' => ['title' => 'New comment', 'body' => "$actor commented on your post", 'url' => '/posts'],

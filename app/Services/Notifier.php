@@ -23,7 +23,7 @@ class Notifier
         if ($type === 'new_message' && ! $preferences['messages']) {
             return;
         }
-        if ($type !== 'new_message' && ! $preferences['social']) {
+        if (! in_array($type, ['new_message', 'incoming_call'], true) && ! $preferences['social']) {
             return;
         }
 

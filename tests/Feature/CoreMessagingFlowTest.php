@@ -107,6 +107,20 @@ class CoreMessagingFlowTest extends TestCase
         ]);
     }
 
+    public function test_incoming_call_creates_a_notification_for_the_other_member(): void
+    {
+        [$alice, $bob] = User::factory()->count(2)->create();
+        $conversation = $this->conversation([$alice, $bob], $alice);
+
+        Sanctum::actingAs($alice);
+        $this->postJson('/api/conversations/'.$conversation->id.'/calls/notify')->assertNoContent();
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $bob->id,
+            'type' => 'incoming_call',
+        ]);
+    }
+
     public function test_blocking_prevents_friend_requests_conversations_and_messages(): void
     {
         [$alice, $bob] = User::factory()->count(2)->create();
