@@ -12,12 +12,15 @@ class Message extends Model
     protected $fillable = [
         'conversation_id',
         'sender_id',
+        'client_message_id',
         'reply_to_id',
         'status_reply_id',
         'type',
         'text',
         'media_path',
         'voice_duration',
+        'call_status',
+        'call_duration',
         'waveform',
         'width',
         'height',
@@ -57,7 +60,16 @@ class Message extends Model
     }
 
     // Appends full public URLs / computed fields so the frontend doesn't build them itself
-    protected $appends = ['media_url', 'reply_preview', 'reaction_summary', 'status_reply_preview'];
+    protected $appends = ['media_url', 'reply_preview', 'reaction_summary', 'status_reply_preview', 'delivery_summary'];
+
+    public function receipts() { return $this->hasMany(MessageReceipt::class); }
+
+    public function getDeliverySummaryAttribute(): array
+    {
+        if (! $this->relationLoaded('receipts')) return [];
+        $total = $this->receipts->count();
+        return ['total' => $total, 'delivered' => $this->receipts->whereNotNull('delivered_at')->count(), 'read' => $this->receipts->whereNotNull('read_at')->count()];
+    }
 
     public function getStatusReplyPreviewAttribute()
     {

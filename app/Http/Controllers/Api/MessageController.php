@@ -12,6 +12,8 @@ use App\Models\MessageReaction;
 use App\Services\CloudinaryUploader;
 use App\Services\Notifier;
 use Illuminate\Http\Request;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 class MessageController extends Controller
 {
@@ -25,6 +27,7 @@ class MessageController extends Controller
             'replyTo.sender:id,name,username',
             'statusReply',
             'reactions',
+            'receipts',
         ]);
         if (! empty($data['before_id'])) $query->where('id', '<', $data['before_id']);
         $items = $query->orderByDesc('id')->limit($limit + 1)->get();
@@ -48,14 +51,26 @@ class MessageController extends Controller
         }
 
         $data = $request->validate([
-            'type' => 'required|in:text,image,voice',
+            'client_message_id' => 'nullable|uuid',
+            'type' => 'required|in:text,image,voice,call',
             'text' => 'required_if:type,text|nullable|string',
             'caption' => 'nullable|string', // optional caption when type=image
             'image' => 'required_if:type,image|nullable|image|max:8192',
             'audio' => 'required_if:type,voice|nullable|file|mimes:webm,mp3,m4a,wav,ogg|max:8192',
             'duration' => 'required_if:type,voice|nullable|string', // e.g. "0:14"
+            'call_status' => 'required_if:type,call|nullable|in:missed,declined,completed',
+            'call_duration' => 'nullable|integer|min:0|max:86400',
             'reply_to_id' => 'nullable|exists:messages,id',
         ]);
+
+        $existing = ! empty($data['client_message_id'])
+            ? Message::where('sender_id', $request->user()->id)->where('client_message_id', $data['client_message_id'])->first()
+            : null;
+        if ($existing) {
+            abort_unless($existing->conversation_id === $conversation->id, 409, 'This message identifier is already used in another conversation.');
+            $existing->load(['sender:id,name,username,avatar', 'replyTo.sender:id,name,username', 'reactions']);
+            return response()->json(['message' => $existing, 'created' => false]);
+        }
 
         if (! empty($data['reply_to_id'])) {
             $replyBelongsToConversation = $conversation->messages()
@@ -68,6 +83,7 @@ class MessageController extends Controller
         $payload = [
             'conversation_id' => $conversation->id,
             'sender_id' => $request->user()->id,
+            'client_message_id' => $data['client_message_id'] ?? null,
             'type' => $data['type'],
             'status' => 'sent',
             'reply_to_id' => $data['reply_to_id'] ?? null,
@@ -95,8 +111,29 @@ class MessageController extends Controller
                 : null;
         }
 
-        $message = $conversation->messages()->create($payload);
-        $message->load(['sender:id,name,username,avatar', 'replyTo.sender:id,name,username', 'reactions']);
+        if ($data['type'] === 'call') {
+            abort_unless(! $conversation->is_group, 422, 'Group call logs are not supported.');
+            $payload['call_status'] = $data['call_status'];
+            $payload['call_duration'] = $data['call_duration'] ?? 0;
+        }
+
+        try {
+            $message = DB::transaction(function () use ($conversation, $payload, $request) {
+                $message = $conversation->messages()->create($payload);
+                $message->receipts()->createMany($conversation->members()->where('users.id', '!=', $request->user()->id)->get()->map(fn ($recipient) => ['user_id' => $recipient->id])->all());
+                return $message;
+            });
+        } catch (QueryException $exception) {
+            if (empty($data['client_message_id'])) throw $exception;
+            $message = Message::where('sender_id', $request->user()->id)
+                ->where('client_message_id', $data['client_message_id'])
+                ->first();
+            if (! $message) throw $exception;
+            abort_unless($message->conversation_id === $conversation->id, 409, 'This message identifier is already used in another conversation.');
+            $message->load(['sender:id,name,username,avatar', 'replyTo.sender:id,name,username', 'reactions']);
+            return response()->json(['message' => $message, 'created' => false]);
+        }
+        $message->load(['sender:id,name,username,avatar', 'replyTo.sender:id,name,username', 'reactions', 'receipts']);
 
         foreach ($conversation->members()->where('users.id', '!=', $request->user()->id)->get() as $recipient) {
             if (! $recipient->pivot->muted) {
@@ -112,7 +149,7 @@ class MessageController extends Controller
 
         \App\Services\SafeBroadcast::send(new MessageSent($message));
 
-        return response()->json($message, 201);
+        return response()->json(['message' => $message, 'created' => true], 201);
     }
 
     // POST /api/messages/{message}/react — toggle/replace my reaction on a message
@@ -153,6 +190,9 @@ class MessageController extends Controller
             ->where('sender_id', '!=', $request->user()->id)
             ->where('status', '!=', 'read')
             ->update(['status' => 'read']);
+        \App\Models\MessageReceipt::where('user_id', $request->user()->id)
+            ->whereHas('message', fn ($query) => $query->where('conversation_id', $conversation->id)->where('sender_id', '!=', $request->user()->id))
+            ->whereNull('read_at')->update(['delivered_at' => now(), 'read_at' => now()]);
 
         $conversation->members()->updateExistingPivot($request->user()->id, [
             'last_read_at' => now(),

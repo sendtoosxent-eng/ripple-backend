@@ -9,6 +9,7 @@ use App\Models\Message;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class CoreMessagingFlowTest extends TestCase
@@ -35,7 +36,7 @@ class CoreMessagingFlowTest extends TestCase
         $firstMessageId = $this->postJson('/api/conversations/'.$conversationId.'/messages', [
             'type' => 'text',
             'text' => 'Hello Bob',
-        ])->assertCreated()->json('id');
+        ])->assertCreated()->json('message.id');
         $this->assertDatabaseHas('notifications', [
             'user_id' => $bob->id,
             'type' => 'new_message',
@@ -84,6 +85,28 @@ class CoreMessagingFlowTest extends TestCase
         ])->assertStatus(422);
     }
 
+    public function test_one_to_one_voice_call_log_is_stored_as_a_message(): void
+    {
+        [$alice, $bob] = User::factory()->count(2)->create();
+        $conversation = $this->conversation([$alice, $bob], $alice);
+
+        Sanctum::actingAs($alice);
+        $response = $this->postJson('/api/conversations/'.$conversation->id.'/messages', [
+            'type' => 'call',
+            'call_status' => 'completed',
+            'call_duration' => 73,
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('messages', [
+            'id' => $response->json('message.id'),
+            'conversation_id' => $conversation->id,
+            'sender_id' => $alice->id,
+            'type' => 'call',
+            'call_status' => 'completed',
+            'call_duration' => 73,
+        ]);
+    }
+
     public function test_blocking_prevents_friend_requests_conversations_and_messages(): void
     {
         [$alice, $bob] = User::factory()->count(2)->create();
@@ -110,6 +133,41 @@ class CoreMessagingFlowTest extends TestCase
         Sanctum::actingAs($alice);
         $this->postJson('/api/conversations/'.$conversation->id.'/leave')
             ->assertStatus(422);
+    }
+
+    public function test_message_creation_is_idempotent_for_a_sender_client_uuid(): void
+    {
+        [$alice, $bob] = User::factory()->count(2)->create();
+        $conversation = $this->conversation([$alice, $bob], $alice);
+        Sanctum::actingAs($alice);
+        $clientId = (string) Str::uuid();
+
+        $first = $this->postJson('/api/conversations/'.$conversation->id.'/messages', [
+            'client_message_id' => $clientId, 'type' => 'text', 'text' => 'Send once',
+        ])->assertCreated()->assertJson(['created' => true]);
+        $second = $this->postJson('/api/conversations/'.$conversation->id.'/messages', [
+            'client_message_id' => $clientId, 'type' => 'text', 'text' => 'Send once',
+        ])->assertOk()->assertJson(['created' => false]);
+
+        $this->assertSame($first->json('message.id'), $second->json('message.id'));
+        $this->assertDatabaseCount('messages', 1);
+        $this->assertDatabaseCount('notifications', 1);
+    }
+
+    public function test_different_senders_may_use_the_same_client_uuid_but_a_sender_cannot_reuse_it_in_another_conversation(): void
+    {
+        [$alice, $bob, $carol] = User::factory()->count(3)->create();
+        $first = $this->conversation([$alice, $bob], $alice);
+        $second = $this->conversation([$alice, $carol], $alice);
+        $clientId = (string) Str::uuid();
+
+        Sanctum::actingAs($alice);
+        $this->postJson('/api/conversations/'.$first->id.'/messages', ['client_message_id' => $clientId, 'type' => 'text', 'text' => 'Alice'])->assertCreated();
+        $this->postJson('/api/conversations/'.$second->id.'/messages', ['client_message_id' => $clientId, 'type' => 'text', 'text' => 'Wrong chat'])->assertConflict();
+
+        Sanctum::actingAs($bob);
+        $this->postJson('/api/conversations/'.$first->id.'/messages', ['client_message_id' => $clientId, 'type' => 'text', 'text' => 'Bob'])->assertCreated();
+        $this->assertDatabaseCount('messages', 2);
     }
 
     public function test_conversation_history_is_paginated_newest_first_without_losing_order(): void

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Conversation;
 use App\Services\CloudinaryUploader;
 use Illuminate\Http\Request;
+use App\Models\MessageReceipt;
 
 class ConversationController extends Controller
 {
@@ -39,10 +40,13 @@ class ConversationController extends Controller
             ->where('sender_id', '!=', $request->user()->id)
             ->where('status', 'sent')
             ->update(['status' => 'delivered']);
+        MessageReceipt::where('user_id', $request->user()->id)
+            ->whereHas('message', fn ($query) => $query->where('conversation_id', $conversation->id)->where('sender_id', '!=', $request->user()->id))
+            ->whereNull('delivered_at')->update(['delivered_at' => now()]);
 
         $conversation->load(['members:id,name,username,avatar,online,status']);
         $items = $conversation->messages()->reorder()->with([
-            'sender:id,name,username,avatar', 'replyTo.sender:id,name,username', 'statusReply', 'reactions',
+            'sender:id,name,username,avatar', 'replyTo.sender:id,name,username', 'statusReply', 'reactions', 'receipts',
         ])->orderByDesc('id')->limit(41)->get();
         $conversation->setRelation('messages', $items->take(40)->reverse()->values());
         $conversation->has_more_messages = $items->count() > 40;
