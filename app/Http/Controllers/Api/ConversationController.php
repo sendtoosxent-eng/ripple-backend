@@ -7,6 +7,7 @@ use App\Models\Conversation;
 use App\Services\CloudinaryUploader;
 use Illuminate\Http\Request;
 use App\Models\MessageReceipt;
+use Illuminate\Support\Facades\DB;
 
 class ConversationController extends Controller
 {
@@ -64,13 +65,16 @@ class ConversationController extends Controller
     {
         $data = $request->validate([
             'member_ids' => 'required|array|min:1',
-            'member_ids.*' => 'exists:users,id',
+            'member_ids.*' => 'integer|distinct|exists:users,id',
             'is_group' => 'boolean',
-            'name' => 'required_if:is_group,true|string|nullable',
+            'name' => 'required_if:is_group,true|string|nullable|max:100',
             'avatar' => 'nullable|image|max:4096',
         ]);
 
         $memberIds = array_unique(array_merge($data['member_ids'], [$request->user()->id]));
+
+        abort_if(! empty($data['is_group']) && count($memberIds) < 3, 422, 'Choose at least two friends for your group.');
+        abort_if(empty($data['is_group']) && count($memberIds) !== 2, 422, 'Choose one friend for a direct conversation.');
 
         $nonFriendIds = array_filter(
             $data['member_ids'],
@@ -145,8 +149,62 @@ class ConversationController extends Controller
         abort_unless($conversation->members->contains($request->user()->id), 403);
         abort_unless($conversation->is_group, 422, 'You cannot leave a one-to-one conversation.');
 
-        $conversation->members()->detach($request->user()->id);
+        DB::transaction(function () use ($request, $conversation) {
+            $conversation = Conversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
+            $conversation->members()->detach($request->user()->id);
+            if ((int) $conversation->created_by === $request->user()->id) {
+                $conversation->update(['created_by' => $conversation->members()->orderBy('conversation_user.id')->value('users.id')]);
+            }
+        });
 
         return response()->json(['message' => 'Left conversation']);
     }
+    // Metadata does not mark messages as read.
+    public function details(Request $request, Conversation $conversation)
+    {
+        $member = $conversation->members()->where('users.id', $request->user()->id)->first();
+        abort_unless($member, 403);
+        $conversation->muted = (bool) $member->pivot->muted;
+        return response()->json($conversation->load('members:id,name,username,avatar,online'));
+    }
+
+    public function addMembers(Request $request, Conversation $conversation)
+    {
+        $data = $request->validate([
+            'member_ids' => 'required|array|min:1|max:100',
+            'member_ids.*' => 'required|integer|distinct|exists:users,id',
+        ]);
+        DB::transaction(function () use ($request, $conversation, $data) {
+            $group = Conversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
+            $this->authorizeOwner($request, $group);
+            foreach ($data['member_ids'] as $id) {
+                if ($group->members()->where('users.id', $id)->exists()) continue;
+                abort_unless($request->user()->isFriendsWith((int) $id), 403, 'Only your friends can be added.');
+                foreach ($group->members as $member) {
+                    abort_if($member->hasBlocked((int) $id) || $member->isBlockedBy((int) $id), 403, 'A group cannot include a blocked account.');
+                }
+            }
+            $group->members()->syncWithoutDetaching($data['member_ids']);
+        });
+        return $this->details($request, $conversation);
+    }
+
+    public function removeMember(Request $request, Conversation $conversation, int $user)
+    {
+        DB::transaction(function () use ($request, $conversation, $user) {
+            $group = Conversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
+            $this->authorizeOwner($request, $group);
+            abort_if($user === $request->user()->id, 422, 'Use Leave group to leave and pass on admin access.');
+            $group->members()->detach($user);
+        });
+        return $this->details($request, $conversation);
+    }
+
+    private function authorizeOwner(Request $request, Conversation $conversation): void
+    {
+        abort_unless($conversation->is_group, 422, 'This action is only available for groups.');
+        abort_unless((int) $conversation->created_by === $request->user()->id
+            && $conversation->members()->where('users.id', $request->user()->id)->exists(), 403, 'Only the group admin can manage members.');
+    }
+
 }

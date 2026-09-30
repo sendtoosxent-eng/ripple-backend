@@ -37,6 +37,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/conversations/{conversation}/calls/notify', [MessageController::class, 'notifyIncomingCall']);
     Route::post('/conversations/{conversation}/read', [MessageController::class, 'markRead']);
     Route::patch('/conversations/{conversation}/mute', [ConversationController::class, 'toggleMute']);
+    Route::get('/conversations/{conversation}/details', [ConversationController::class, 'details']);
+    Route::post('/conversations/{conversation}/members', [ConversationController::class, 'addMembers']);
+    Route::delete('/conversations/{conversation}/members/{user}', [ConversationController::class, 'removeMember']);
     Route::post('/conversations/{conversation}/leave', [ConversationController::class, 'leave']);
     Route::post('/messages/{message}/react', [MessageController::class, 'react']);
 
