@@ -56,7 +56,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        $user->update(['online' => true]);
+        $user->update(['online' => true, 'last_seen_at' => now()]);
 
         $token = $user->createToken('chat-app')->plainTextToken;
 

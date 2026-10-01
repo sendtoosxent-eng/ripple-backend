@@ -15,7 +15,7 @@ class ConversationController extends Controller
     public function index(Request $request)
     {
         $conversations = $request->user()->conversations()
-            ->with(['latestMessage.sender:id,name,username,avatar', 'members:id,name,username,avatar,online'])
+            ->with(['latestMessage.sender:id,name,username,avatar', 'members:id,name,username,avatar,online,last_seen_at'])
             ->get()
             ->sortByDesc(fn ($conversation) => $conversation->latestMessage?->created_at ?? $conversation->created_at)
             ->values();
@@ -45,7 +45,7 @@ class ConversationController extends Controller
             ->whereHas('message', fn ($query) => $query->where('conversation_id', $conversation->id)->where('sender_id', '!=', $request->user()->id))
             ->whereNull('delivered_at')->update(['delivered_at' => now()]);
 
-        $conversation->load(['members:id,name,username,avatar,online,status']);
+        $conversation->load(['members:id,name,username,avatar,online,last_seen_at,status']);
         $items = $conversation->messages()->reorder()->with([
             'sender:id,name,username,avatar', 'replyTo.sender:id,name,username', 'statusReply', 'reactions', 'receipts',
         ])->orderByDesc('id')->limit(41)->get();
@@ -165,7 +165,7 @@ class ConversationController extends Controller
         $member = $conversation->members()->where('users.id', $request->user()->id)->first();
         abort_unless($member, 403);
         $conversation->muted = (bool) $member->pivot->muted;
-        return response()->json($conversation->load('members:id,name,username,avatar,online'));
+        return response()->json($conversation->load('members:id,name,username,avatar,online,last_seen_at'));
     }
 
     public function addMembers(Request $request, Conversation $conversation)
