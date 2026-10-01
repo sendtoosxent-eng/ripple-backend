@@ -12,7 +12,7 @@ class CloudinaryUploader
      * Using Cloudinary instead of local disk storage because Render's free
      * tier wipes local files on every restart/redeploy.
      */
-    public static function upload(UploadedFile $file, string $folder = 'ripple'): string
+    public static function upload(UploadedFile $file, string $folder = 'ripple', string $resourceType = 'auto'): string
     {
         $cloudName = config('services.cloudinary.cloud_name');
         $preset = config('services.cloudinary.upload_preset');
@@ -21,8 +21,8 @@ class CloudinaryUploader
             throw new \RuntimeException('Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME and CLOUDINARY_UPLOAD_PRESET.');
         }
 
-        $response = Http::attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
-            ->post("https://api.cloudinary.com/v1_1/{$cloudName}/auto/upload", [
+        $response = Http::connectTimeout(10)->timeout(60)->attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
+            ->post("https://api.cloudinary.com/v1_1/{$cloudName}/{$resourceType}/upload", [
                 'upload_preset' => $preset,
                 'folder' => $folder,
             ]);

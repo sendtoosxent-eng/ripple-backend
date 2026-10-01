@@ -18,6 +18,9 @@ class Message extends Model
         'type',
         'text',
         'media_path',
+        'file_name',
+        'file_size',
+        'mime_type',
         'voice_duration',
         'call_status',
         'call_duration',
@@ -108,7 +111,7 @@ class Message extends Model
             'sender_name' => $original->sender?->name,
             'preview' => $original->type === 'text'
                 ? $original->text
-                : ($original->type === 'image' ? 'Photo' : 'Voice message'),
+                : match ($original->type) { 'image' => 'Photo', 'file' => $original->file_name ?? 'Document', 'call' => 'Call', default => 'Voice message' },
         ];
     }
 

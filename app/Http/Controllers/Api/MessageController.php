@@ -70,12 +70,13 @@ class MessageController extends Controller
 
         $data = $request->validate([
             'client_message_id' => 'nullable|uuid',
-            'type' => 'required|in:text,image,voice,call',
+            'type' => 'required|in:text,image,voice,call,file',
             'text' => 'required_if:type,text|nullable|string',
-            'caption' => 'nullable|string', // optional caption when type=image
+            'caption' => 'nullable|string|max:10000', // optional caption when type=image
             'image' => 'required_if:type,image|nullable|image|max:8192',
             'audio' => 'required_if:type,voice|nullable|file|mimes:webm,mp3,m4a,wav,ogg|max:8192',
-            'duration' => 'required_if:type,voice|nullable|string', // e.g. "0:14"
+            'file' => 'required_if:type,file|nullable|file|max:20480',
+            'duration' => 'required_if:type,voice|nullable|string|max:16', // e.g. "0:14"
             'call_status' => 'required_if:type,call|nullable|in:missed,declined,completed',
             'call_duration' => 'nullable|integer|min:0|max:86400',
             'reply_to_id' => 'nullable|exists:messages,id',
@@ -127,6 +128,15 @@ class MessageController extends Controller
             $payload['waveform'] = $request->input('waveform')
                 ? json_decode($request->input('waveform'), true)
                 : null;
+        }
+
+        if ($data['type'] === 'file') {
+            $file = $request->file('file');
+            $payload['media_path'] = CloudinaryUploader::upload($file, 'chat-files', 'raw');
+            $payload['file_name'] = mb_substr(basename($file->getClientOriginalName()), 0, 255);
+            $payload['file_size'] = $file->getSize();
+            $payload['mime_type'] = $file->getMimeType();
+            $payload['text'] = $data['caption'] ?? null;
         }
 
         if ($data['type'] === 'call') {

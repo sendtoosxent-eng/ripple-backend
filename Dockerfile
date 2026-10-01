@@ -17,6 +17,8 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 RUN mkdir -p storage/app/public storage/framework/cache storage/framework/sessions storage/framework/views storage/logs \
     && chmod -R 775 storage bootstrap/cache
 
+RUN printf "upload_max_filesize=20M\npost_max_size=24M\n" > /usr/local/etc/php/conf.d/uploads.ini
+
 EXPOSE 10000
 
 CMD php artisan migrate --force && php artisan conversations:dedupe && php artisan storage:link && php artisan serve --host 0.0.0.0 --port ${PORT:-10000}
