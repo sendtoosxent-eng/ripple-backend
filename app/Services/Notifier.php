@@ -11,6 +11,7 @@ class Notifier
     public static function send(int $userId, string $type, array $data): void
     {
         $user = User::find($userId);
+
         if (! $user) {
             return;
         }
@@ -20,10 +21,17 @@ class Notifier
             'social' => true,
         ], $user->notification_preferences ?? []);
 
-        if ($type === 'new_message' && ! $preferences['messages']) {
+        if (
+            $type === 'new_message' &&
+            ! $preferences['messages']
+        ) {
             return;
         }
-        if (! in_array($type, ['new_message', 'incoming_call'], true) && ! $preferences['social']) {
+
+        if (
+            ! in_array($type, ['new_message', 'incoming_call'], true) &&
+            ! $preferences['social']
+        ) {
             return;
         }
 
@@ -34,7 +42,23 @@ class Notifier
             'read' => false,
         ]);
 
-        SafeBroadcast::send(new NotificationCreated($notification));
-        WebPushSender::send($userId, $type, $data);
+        // Realtime Ripple notification
+        SafeBroadcast::send(
+            new NotificationCreated($notification)
+        );
+
+        // Existing browser push notifications
+        WebPushSender::send(
+            $userId,
+            $type,
+            $data
+        );
+
+        // iPhone / Android mobile push notifications
+        ExpoPushSender::send(
+            $userId,
+            $type,
+            $data
+        );
     }
 }

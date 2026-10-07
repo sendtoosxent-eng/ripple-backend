@@ -48,6 +48,12 @@ class FriendController extends Controller
 
         \App\Services\SafeBroadcast::send(new FriendRequestUpdated($fr, $request->user()->id));
 
+        Notifier::send((int) $data['receiver_id'], 'friend_request', [
+            'actor_id' => $request->user()->id,
+            'actor_name' => $request->user()->name,
+            'actor_avatar' => $request->user()->avatar_url,
+        ]);
+
         return response()->json($fr, 201);
     }
 

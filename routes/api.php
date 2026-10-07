@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\FriendController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NotificationController;
@@ -32,17 +33,68 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/conversations', [ConversationController::class, 'index']);
     Route::post('/conversations', [ConversationController::class, 'store']);
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
-    Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']);
-    Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
-    Route::post('/conversations/{conversation}/calls/notify', [MessageController::class, 'notifyIncomingCall']);
-    Route::post('/conversations/{conversation}/read', [MessageController::class, 'markRead']);
-    Route::patch('/conversations/{conversation}/mute', [ConversationController::class, 'toggleMute']);
-    Route::get('/conversations/{conversation}/details', [ConversationController::class, 'details']);
-    Route::post('/conversations/{conversation}/members', [ConversationController::class, 'addMembers']);
-    Route::delete('/conversations/{conversation}/members/{user}', [ConversationController::class, 'removeMember']);
-    Route::post('/conversations/{conversation}/leave', [ConversationController::class, 'leave']);
-    Route::post('/messages/{message}/react', [MessageController::class, 'react']);
 
+    Route::get(
+        '/conversations/{conversation}/typing',
+        [\App\Http\Controllers\Api\TypingController::class, 'index']
+    );
+
+    Route::post(
+        '/conversations/{conversation}/typing',
+        [\App\Http\Controllers\Api\TypingController::class, 'update']
+    )->middleware('throttle:90,1');
+
+    Route::get(
+        '/conversations/{conversation}/messages',
+        [MessageController::class, 'index']
+    );
+
+    Route::post(
+        '/conversations/{conversation}/messages',
+        [MessageController::class, 'store']
+    );
+
+    Route::post(
+        '/conversations/{conversation}/calls/notify',
+        [MessageController::class, 'notifyIncomingCall']
+    );
+
+    Route::post(
+        '/conversations/{conversation}/read',
+        [MessageController::class, 'markRead']
+    );
+
+    Route::patch(
+        '/conversations/{conversation}/mute',
+        [ConversationController::class, 'toggleMute']
+    );
+
+    Route::get(
+        '/conversations/{conversation}/details',
+        [ConversationController::class, 'details']
+    );
+
+    Route::post(
+        '/conversations/{conversation}/members',
+        [ConversationController::class, 'addMembers']
+    );
+
+    Route::delete(
+        '/conversations/{conversation}/members/{user}',
+        [ConversationController::class, 'removeMember']
+    );
+
+    Route::post(
+        '/conversations/{conversation}/leave',
+        [ConversationController::class, 'leave']
+    );
+
+    Route::post(
+        '/messages/{message}/react',
+        [MessageController::class, 'react']
+    );
+
+    // Statuses
     Route::get('/statuses', [StatusController::class, 'index']);
     Route::post('/statuses', [StatusController::class, 'store']);
     Route::post('/statuses/{status}/view', [StatusController::class, 'markViewed']);
@@ -51,13 +103,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/statuses/{status}/like', [StatusController::class, 'toggleLike']);
     Route::post('/statuses/{status}/repost', [StatusController::class, 'repost']);
 
+    // Friends
     Route::get('/friend-requests', [FriendController::class, 'index']);
     Route::post('/friend-requests', [FriendController::class, 'store']);
-    Route::post('/friend-requests/{friendRequest}/accept', [FriendController::class, 'accept']);
-    Route::post('/friend-requests/{friendRequest}/reject', [FriendController::class, 'reject']);
+
+    Route::post(
+        '/friend-requests/{friendRequest}/accept',
+        [FriendController::class, 'accept']
+    );
+
+    Route::post(
+        '/friend-requests/{friendRequest}/reject',
+        [FriendController::class, 'reject']
+    );
+
     Route::get('/friends', [FriendController::class, 'friends']);
     Route::get('/friend-status/{user}', [FriendController::class, 'statusWith']);
 
+    // Posts
     Route::get('/posts', [PostController::class, 'index']);
     Route::post('/posts', [PostController::class, 'store']);
     Route::post('/posts/{post}/like', [PostController::class, 'toggleLike']);
@@ -66,14 +129,53 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/posts/{post}/comments', [PostController::class, 'addComment']);
     Route::delete('/posts/{post}', [PostController::class, 'destroy']);
 
+    // Notifications
     Route::get('/notifications', [NotificationController::class, 'index']);
-    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
-    Route::get('/notification-preferences', [NotificationController::class, 'preferences']);
-    Route::patch('/notification-preferences', [NotificationController::class, 'updatePreferences']);
-    Route::get('/push/vapid-public-key', [PushSubscriptionController::class, 'key']);
-    Route::post('/push/subscriptions', [PushSubscriptionController::class, 'store']);
-    Route::delete('/push/subscriptions', [PushSubscriptionController::class, 'destroy']);
+
+    Route::get(
+        '/notifications/unread-count',
+        [NotificationController::class, 'unreadCount']
+    );
+
+    Route::get(
+        '/notification-preferences',
+        [NotificationController::class, 'preferences']
+    );
+
+    Route::patch(
+        '/notification-preferences',
+        [NotificationController::class, 'updatePreferences']
+    );
+
+    // Existing browser/web push notifications
+    Route::get(
+        '/push/vapid-public-key',
+        [PushSubscriptionController::class, 'key']
+    );
+
+    Route::post(
+        '/push/subscriptions',
+        [PushSubscriptionController::class, 'store']
+    );
+
+    Route::delete(
+        '/push/subscriptions',
+        [PushSubscriptionController::class, 'destroy']
+    );
+
+    // Mobile iOS / Android push notification devices
+    Route::post(
+        '/devices/register',
+        [DeviceController::class, 'register']
+    );
+
+    Route::delete(
+        '/devices/unregister',
+        [DeviceController::class, 'unregister']
+    );
 });
 
 // Lets Laravel Echo verify a user is allowed to listen to a private channel.
-Broadcast::routes(['middleware' => ['auth:sanctum']]);
+Broadcast::routes([
+    'middleware' => ['auth:sanctum']
+]);
