@@ -101,6 +101,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/statuses/{status}', [StatusController::class, 'destroy']);
     Route::post('/statuses/{status}/reply', [StatusController::class, 'reply']);
     Route::post('/statuses/{status}/like', [StatusController::class, 'toggleLike']);
+    Route::post('/statuses/{status}/react', [StatusController::class, 'react']);
     Route::post('/statuses/{status}/repost', [StatusController::class, 'repost']);
 
     // Friends
@@ -124,7 +125,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/posts', [PostController::class, 'index']);
     Route::post('/posts', [PostController::class, 'store']);
     Route::post('/posts/{post}/like', [PostController::class, 'toggleLike']);
+    Route::post('/posts/{post}/react', [PostController::class, 'react']);
     Route::post('/posts/{post}/repost', [PostController::class, 'toggleRepost']);
+    Route::post('/posts/{post}/share', [PostController::class, 'share']);
+    Route::post('/posts/{post}/share-to-status', [PostController::class, 'shareToStatus']);
     Route::get('/posts/{post}/comments', [PostController::class, 'comments']);
     Route::post('/posts/{post}/comments', [PostController::class, 'addComment']);
     Route::delete('/posts/{post}', [PostController::class, 'destroy']);

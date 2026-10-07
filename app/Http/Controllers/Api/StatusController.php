@@ -8,6 +8,7 @@ use App\Models\Conversation;
 use App\Models\Status;
 use App\Models\StatusView;
 use App\Models\StatusLike;
+use App\Models\StatusReaction;
 use App\Services\Notifier;
 use App\Services\CloudinaryUploader;
 use Illuminate\Http\Request;
@@ -24,7 +25,7 @@ class StatusController extends Controller
 
         $statuses = Status::active()
             ->whereIn('user_id', $friendIds)
-            ->with(['user:id,name,username,avatar', 'views', 'likes', 'repostedFrom.user:id,name,username,avatar'])
+            ->with(['user:id,name,username,avatar', 'views', 'likes', 'reactions', 'repostedFrom.user:id,name,username,avatar'])
             ->orderBy('created_at')
             ->get()
             ->groupBy('user_id')
@@ -43,12 +44,18 @@ class StatusController extends Controller
                         'type' => $s->type,
                         'text' => $s->text,
                         'media_url' => $s->media_url,
+                        'media_duration_ms' => $s->media_duration_ms,
                         'background' => $s->background,
                         'created_at' => $s->created_at,
                         'viewed_by_me' => $s->views->contains('viewer_id', $me->id),
                         'view_count' => $s->views->count(),
                         'likes_count' => $s->likes->count(),
                         'liked_by_me' => $s->likes->contains('user_id', $me->id),
+                        'my_reaction' => optional($s->reactions->firstWhere('user_id', $me->id))->emoji,
+                        'reaction_summary' => $s->reactions->groupBy('emoji')->map(fn ($items, $emoji) => [
+                            'emoji' => $emoji,
+                            'count' => $items->count(),
+                        ])->values(),
                         'reposted_from' => $s->repostedFrom ? [
                             'id' => $s->repostedFrom->id,
                             'user' => [
@@ -65,13 +72,15 @@ class StatusController extends Controller
         return response()->json($statuses);
     }
 
-    // POST /api/statuses — post a text or image status
+    // POST /api/statuses — post a text, image or short video status
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'type' => 'required|in:text,image',
+            'type' => 'required|in:text,image,video',
             'text' => 'required_if:type,text|nullable|string|max:500',
             'image' => 'required_if:type,image|nullable|image|max:8192',
+            'video' => 'required_if:type,video|nullable|file|mimetypes:video/mp4,video/quicktime,video/webm|max:51200',
+            'media_duration_ms' => 'required_if:type,video|nullable|integer|min:1|max:30000',
             'background' => 'nullable|string|max:2048',
         ]);
 
@@ -89,6 +98,11 @@ class StatusController extends Controller
 
         if ($request->type === 'image' && $request->hasFile('image')) {
             $payload['media_path'] = CloudinaryUploader::upload($request->file('image'), 'statuses');
+        }
+
+        if ($request->type === 'video' && $request->hasFile('video')) {
+            $payload['media_path'] = CloudinaryUploader::upload($request->file('video'), 'statuses', 'video');
+            $payload['media_duration_ms'] = $request->media_duration_ms;
         }
 
         $status = Status::create($payload);
@@ -182,6 +196,30 @@ class StatusController extends Controller
         }
 
         return response()->json(['liked' => $liked, 'likes_count' => $status->likes()->count()]);
+    }
+
+    public function react(Request $request, Status $status)
+    {
+        abort_if($status->expires_at->isPast(), 410, 'This update has expired.');
+        abort_unless($status->user_id === $request->user()->id || $request->user()->isFriendsWith($status->user_id), 403);
+        $data = $request->validate(['emoji' => 'required|string|max:16']);
+        $reaction = StatusReaction::where('status_id', $status->id)->where('user_id', $request->user()->id)->first();
+
+        if ($reaction && $reaction->emoji === $data['emoji']) {
+            $reaction->delete();
+            $mine = null;
+        } else {
+            StatusReaction::updateOrCreate(
+                ['status_id' => $status->id, 'user_id' => $request->user()->id],
+                ['emoji' => $data['emoji']]
+            );
+            $mine = $data['emoji'];
+        }
+
+        $summary = $status->reactions()->get()->groupBy('emoji')->map(fn ($items, $emoji) => [
+            'emoji' => $emoji, 'count' => $items->count(),
+        ])->values();
+        return response()->json(['my_reaction' => $mine, 'reaction_summary' => $summary]);
     }
 
     public function repost(Request $request, Status $status)

@@ -91,4 +91,29 @@ class SocialFeaturesTest extends TestCase
         $this->assertDatabaseHas('status_likes', ['status_id' => $statusId, 'user_id' => $bob->id]);
         $this->assertDatabaseHas('statuses', ['id' => $repostId, 'user_id' => $bob->id, 'reposted_from_id' => $statusId]);
     }
+
+    public function test_posts_and_statuses_support_reactions_and_sharing(): void
+    {
+        [$alice, $bob] = User::factory()->count(2)->create();
+        FriendRequest::create(['sender_id' => $alice->id, 'receiver_id' => $bob->id, 'status' => 'accepted']);
+
+        Sanctum::actingAs($alice);
+        $postId = $this->postJson('/api/posts', ['text' => 'A shareable moment'])->assertCreated()->json('id');
+
+        Sanctum::actingAs($bob);
+        $this->postJson("/api/posts/{$postId}/react", ['emoji' => '🔥'])
+            ->assertOk()->assertJsonPath('my_reaction', '🔥');
+        $this->postJson("/api/posts/{$postId}/share", ['user_id' => $alice->id])
+            ->assertCreated()->assertJsonStructure(['conversation_id']);
+        $statusId = $this->postJson("/api/posts/{$postId}/share-to-status")
+            ->assertCreated()->json('id');
+
+        Sanctum::actingAs($alice);
+        $this->postJson("/api/statuses/{$statusId}/react", ['emoji' => '👏'])
+            ->assertOk()->assertJsonPath('my_reaction', '👏');
+
+        $this->assertDatabaseHas('post_reactions', ['post_id' => $postId, 'user_id' => $bob->id, 'emoji' => '🔥']);
+        $this->assertDatabaseHas('status_reactions', ['status_id' => $statusId, 'user_id' => $alice->id, 'emoji' => '👏']);
+        $this->assertDatabaseHas('messages', ['sender_id' => $bob->id]);
+    }
 }

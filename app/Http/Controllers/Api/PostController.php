@@ -4,11 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Events\PostCommentAdded;
 use App\Events\PostCreated;
+use App\Events\MessageSent;
 use App\Http\Controllers\Controller;
 use App\Models\Post;
 use App\Models\PostComment;
 use App\Models\PostLike;
 use App\Models\PostRepost;
+use App\Models\PostReaction;
+use App\Models\Conversation;
+use App\Models\Status;
 use App\Services\CloudinaryUploader;
 use App\Services\Notifier;
 use Illuminate\Http\Request;
@@ -21,7 +25,7 @@ class PostController extends Controller
     {
         $me = $request->user()->id;
 
-        $posts = Post::with('user:id,name,username,avatar')
+        $posts = Post::with(['user:id,name,username,avatar', 'reactions'])
             ->withCount(['likes', 'comments', 'reposts'])
             ->latest()
             ->paginate(20);
@@ -29,6 +33,12 @@ class PostController extends Controller
         $posts->getCollection()->transform(function ($post) use ($me) {
             $post->liked_by_me = $post->likes()->where('user_id', $me)->exists();
             $post->reposted_by_me = $post->reposts()->where('user_id', $me)->exists();
+            $post->my_reaction = optional($post->reactions->firstWhere('user_id', $me))->emoji;
+            $post->reaction_summary = $post->reactions->groupBy('emoji')->map(fn ($items, $emoji) => [
+                'emoji' => $emoji,
+                'count' => $items->count(),
+            ])->values();
+            unset($post->reactions);
             return $post;
         });
 
@@ -41,20 +51,37 @@ class PostController extends Controller
         $validator = Validator::make($request->all(), [
             'text' => 'nullable|string|max:500',
             'image' => 'nullable|image|max:8192',
+            'media' => 'nullable|file|mimetypes:image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm|max:51200',
+            'media_type' => 'nullable|in:image,video',
+            'media_duration_ms' => 'nullable|integer|min:1|max:30000',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        if (! $request->text && ! $request->hasFile('image')) {
-            return response()->json(['message' => 'Post needs text or an image.'], 422);
+        if (! $request->text && ! $request->hasFile('image') && ! $request->hasFile('media')) {
+            return response()->json(['message' => 'Post needs text, a photo, or a video.'], 422);
+        }
+
+        if ($request->media_type === 'video' && ! $request->filled('media_duration_ms')) {
+            return response()->json(['message' => 'Video duration is required.'], 422);
         }
 
         $payload = ['user_id' => $request->user()->id, 'text' => $request->text];
 
         if ($request->hasFile('image')) {
             $payload['image_path'] = CloudinaryUploader::upload($request->file('image'), 'posts');
+        }
+
+        if ($request->hasFile('media')) {
+            $payload['media_type'] = $request->media_type;
+            $payload['media_duration_ms'] = $request->media_duration_ms;
+            $payload['media_path'] = CloudinaryUploader::upload(
+                $request->file('media'),
+                'posts',
+                $request->media_type === 'video' ? 'video' : 'image'
+            );
         }
 
         $post = Post::create($payload);
@@ -75,6 +102,77 @@ class PostController extends Controller
         }
 
         return response()->json($post, 201);
+    }
+
+    public function react(Request $request, Post $post)
+    {
+        $data = $request->validate(['emoji' => 'required|string|max:16']);
+        $reaction = PostReaction::where('post_id', $post->id)->where('user_id', $request->user()->id)->first();
+
+        if ($reaction && $reaction->emoji === $data['emoji']) {
+            $reaction->delete();
+            $mine = null;
+        } else {
+            PostReaction::updateOrCreate(
+                ['post_id' => $post->id, 'user_id' => $request->user()->id],
+                ['emoji' => $data['emoji']]
+            );
+            $mine = $data['emoji'];
+        }
+
+        $summary = $post->reactions()->get()->groupBy('emoji')->map(fn ($items, $emoji) => [
+            'emoji' => $emoji,
+            'count' => $items->count(),
+        ])->values();
+
+        return response()->json(['my_reaction' => $mine, 'reaction_summary' => $summary]);
+    }
+
+    public function share(Request $request, Post $post)
+    {
+        $data = $request->validate(['user_id' => 'required|integer|exists:users,id']);
+        $me = $request->user();
+        abort_if((int) $data['user_id'] === $me->id, 422, 'Choose another person.');
+        abort_unless($me->isFriendsWith((int) $data['user_id']), 403, 'You can only share posts with friends.');
+
+        $conversation = $me->conversations()->where('is_group', false)
+            ->whereHas('members', fn ($q) => $q->where('users.id', $data['user_id']))->first();
+        if (! $conversation) {
+            $conversation = Conversation::create(['is_group' => false, 'created_by' => $me->id]);
+            $conversation->members()->attach([$me->id, $data['user_id']]);
+        }
+
+        $description = trim((string) $post->text) ?: ($post->media_type === 'video' ? 'Video post' : 'Photo post');
+        $message = $conversation->messages()->create([
+            'sender_id' => $me->id,
+            'type' => 'text',
+            'text' => "Shared @{$post->user->username}'s post:\n{$description}",
+            'status' => 'sent',
+        ]);
+        $message->load(['sender:id,name,username,avatar', 'reactions']);
+        \App\Services\SafeBroadcast::send(new MessageSent($message));
+        Notifier::send((int) $data['user_id'], 'new_message', [
+            'actor_id' => $me->id, 'actor_name' => $me->name,
+            'conversation_id' => $conversation->id, 'preview' => 'Shared a post',
+        ]);
+
+        return response()->json(['conversation_id' => $conversation->id], 201);
+    }
+
+    public function shareToStatus(Request $request, Post $post)
+    {
+        $mediaPath = $post->media_path ?: $post->image_path;
+        $type = $post->media_type ?: ($mediaPath ? 'image' : 'text');
+        $status = Status::create([
+            'user_id' => $request->user()->id,
+            'type' => $type,
+            'text' => $post->text ?: "Shared @{$post->user->username}'s post",
+            'media_path' => $mediaPath,
+            'media_duration_ms' => $post->media_duration_ms,
+            'background' => '#188B84',
+            'expires_at' => now()->addDay(),
+        ]);
+        return response()->json($status, 201);
     }
 
     // POST /api/posts/{post}/like — toggle

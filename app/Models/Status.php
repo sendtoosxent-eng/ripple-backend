@@ -9,7 +9,7 @@ class Status extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['user_id', 'reposted_from_id', 'type', 'text', 'media_path', 'background', 'expires_at'];
+    protected $fillable = ['user_id', 'reposted_from_id', 'type', 'text', 'media_path', 'media_duration_ms', 'background', 'expires_at'];
 
     protected function casts(): array
     {
@@ -40,6 +40,11 @@ class Status extends Model
     public function likes()
     {
         return $this->hasMany(StatusLike::class);
+    }
+
+    public function reactions()
+    {
+        return $this->hasMany(StatusReaction::class);
     }
 
     public function repostedFrom()
